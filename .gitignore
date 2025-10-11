@@ -50,6 +50,8 @@
 .idea/**/usage.statistics.xml
 .idea/**/dictionaries
 .idea/**/shelf
+.idea/material_theme_project_new.xml
+.idea/editor.xml
 
 # AWS User-specific
 .idea/**/aws.xml
