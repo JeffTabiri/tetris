@@ -32,6 +32,9 @@
       void render();
       void process_input();
       void spawn_block();
+      void rotate_block();
+      void clear_blocks();
+      void check_rotations();
       void reset();
       void check_random_bag();
       void check_bounds();
