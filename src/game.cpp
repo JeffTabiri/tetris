@@ -4,21 +4,20 @@
 #include <iterator>
 #include <random>
 
-
 // game setting
 constexpr Uint32 SDL_FLAGS { SDL_INIT_VIDEO };
 constexpr int CELL_SIZE { 30 };
 constexpr int FIELD_WIDTH { 10 };
 constexpr int FIELD_HEIGHT { 20 };
-constexpr int SPAWN_POINT[2] { 0, 6 };
 
 // window setting
 constexpr int WINDOW_WIDTH = { FIELD_WIDTH * CELL_SIZE };
 constexpr int WINDOW_HEIGHT = { FIELD_HEIGHT * CELL_SIZE };
 
-typedef struct TETRIMINOES {
+struct TETRIMINOES {
   int positions[4][8];
 };
+
 
 const TETRIMINOES tetriminoes[7] = {
   // I piece
@@ -89,7 +88,7 @@ const TETRIMINOES tetriminoes[7] = {
             {1,0, 1,1, 2,1, 2,2},    // Down (same)
             {0,2, 1,2, 1,1, 2,1},    // Left (same)
         }
-  },
+  }
 };
 
 int current_bag_idx = 0;
@@ -101,6 +100,7 @@ enum GameStates {
   PLAY,
   FINISHED,
 };
+
 GameStates current_game_state;
 
 // player settings
@@ -122,7 +122,10 @@ void Game::check_random_bag() {
     }
 }
 
+
+
 void Game::spawn_block() {
+
   clear_blocks();
 
   current_y = 0;
@@ -135,6 +138,14 @@ void Game::spawn_block() {
     current_block[i] = tetriminoes[bag_sequence[current_bag_idx]].positions[current_rotation][i];
   }
 
+  for (int i = 0; i < 8; i += 2) {
+    int y = current_y + current_block[i];
+    int x = current_x + current_block[i + 1];
+    if (grid[y][x] == true) {
+      is_running = false;
+      return;
+    }
+  }
 
   // create blocks
   for (int i = 0; i < 8; i += 2) {
@@ -158,25 +169,29 @@ void Game::render() {
 void Game::process_input() {
   while (SDL_PollEvent(&event)) {
     switch (event.type) {
+
     case SDL_EVENT_KEY_DOWN:
+
       if (event.key.scancode == SDL_SCANCODE_LEFT) {
-        move_left();
+        move(-1);
       } else if (event.key.scancode == SDL_SCANCODE_RIGHT) {
-        move_right();
+        move(1);
       } else if (event.key.scancode == SDL_SCANCODE_UP) {
         rotate_block();
-      } else if (event.key.scancode == SDL_SCANCODE_SPACE) {
-
       } else if (event.key.scancode == SDL_SCANCODE_DOWN) {
         drop_rate = 50;
+      } else if (event.key.scancode == SDL_SCANCODE_KP_ENTER && current_game_state == FINISHED) {
+        reset();
       }
 
       break;
+
     case SDL_EVENT_KEY_UP:
       if (event.key.scancode == SDL_SCANCODE_DOWN) {
         drop_rate = 200;
       }
       break;
+
     case SDL_EVENT_QUIT:
       is_running = false;
       break;
@@ -186,10 +201,10 @@ void Game::process_input() {
   }
 }
 
-bool Game::check_boundary(int new_y, int new_x) {
+bool Game::check_boundary(const int new_y, const int new_x) {
   for (int i = 0; i < 8; i += 2) {
-    int cy = new_y + current_block[i];
-    int cx = new_x + current_block[i + 1];
+    const int cy = new_y + current_block[i];
+    const int cx = new_x + current_block[i + 1];
 
     // Out of bounds
     if (cx < 0 || cx >= FIELD_WIDTH || cy < 0 || cy >= FIELD_HEIGHT) {
@@ -199,25 +214,67 @@ bool Game::check_boundary(int new_y, int new_x) {
   return false;
 }
 
-void Game::rotate_block() {
+bool Game::check_rotations() {
   for (int i = 0; i < 8; i += 2)
     grid[current_y + current_block[i]][current_x + current_block[i + 1]] = false;
 
-  current_rotation = (current_rotation + 1) % 4;
+  int rotation_idx = (current_rotation + 1) % 4;
+  int temp_block[8] = {};
+  for (int i = 0; i < 8; i++) {
+    temp_block[i] = tetriminoes[bag_sequence[current_bag_idx]].positions[rotation_idx][i];
+  }
 
+  // check for border collision or object collision.
+  for (int i = 0; i < 8; i += 2) {
+    int cy = current_y + temp_block[i];
+    int cx = current_x + temp_block[i + 1];
 
+    if (cx < 0 || cx >= FIELD_WIDTH || cy < 0 || cy >= FIELD_HEIGHT) {
+      for (int i = 0; i < 8; i += 2)
+        grid[current_y + current_block[i]][current_x + current_block[i + 1]] = true;
+      return true;
+    }
+
+    if (grid[cy][cx]) {
+      for (int i = 0; i < 8; i += 2)
+        grid[current_y + current_block[i]][current_x + current_block[i + 1]] = true;
+      return true;
+    }
+  }
+
+  return false;
+}
+
+void Game::rotate_block() {
+
+  if (check_rotations()) {
+    return;
+  }
+  
+  for (int i = 0; i < 8; i += 2)
+    grid[current_y + current_block[i]][current_x + current_block[i + 1]] = false;
 
   // Get the rotated block
+  current_rotation = (current_rotation + 1) % 4;
   for (int i = 0; i < 8; i++) {
     current_block[i] = tetriminoes[bag_sequence[current_bag_idx]].positions[current_rotation][i];
   }
-
   for (int i = 0; i < 8; i += 2)
     grid[current_y + current_block[i]][current_x + current_block[i + 1]] = true;
+
 }
 
 
-void Game::update() {
+void Game::update(uint32_t *time) {
+  if (current_game_state == NEW_BLOCK) {
+    spawn_block();
+  }
+
+  // handle gravity every second
+  if (SDL_GetTicks() - *time >= drop_rate) {
+    move_down();
+    *time = SDL_GetTicks();
+  }
 }
 
 void Game::clear_blocks() {
@@ -253,6 +310,16 @@ void Game::draw_field() {
 
   SDL_SetRenderDrawColor(renderer, 255, 255, 255, 0);
 
+  for (int i = 0; i < FIELD_HEIGHT; ++i) {
+    for (int j = 0; j < FIELD_WIDTH; ++j) {
+      if (grid[i][j]) {
+        SDL_FRect rect = {j * 30.0f, i * 30.0f, CELL_SIZE, CELL_SIZE};
+        SDL_RenderFillRect(renderer, &rect);
+      }
+    }
+  }
+
+  SDL_SetRenderDrawColor(renderer, 120, 120, 120, 0);
   for (int i = 1; i <= FIELD_WIDTH; ++i) {
     const int x = i * CELL_SIZE;
     SDL_RenderLine(renderer, x, 0, x, WINDOW_HEIGHT);
@@ -261,15 +328,6 @@ void Game::draw_field() {
   for (int i = 1; i <= FIELD_HEIGHT; ++i) {
     const int y = i * CELL_SIZE;
     SDL_RenderLine(renderer, 0, y, WINDOW_WIDTH, y);
-  }
-
-  for (int i = 0; i < FIELD_HEIGHT; ++i) {
-    for (int j = 0; j < FIELD_WIDTH; ++j) {
-      if (grid[i][j]) {
-        SDL_FRect rect = {j * 30.0f, i * 30.0f, CELL_SIZE, CELL_SIZE};
-        SDL_RenderFillRect(renderer, &rect);
-      }
-    }
   }
 }
 
@@ -296,30 +354,17 @@ bool Game::init() {
   return true;
 }
 
-void Game::move_right() {
-  if (check_boundary(current_y, current_x + 1)) return;
-  if (check_collisions(current_y, current_x + 1)) return;
+void Game::move(const int direction) {
+  if (check_boundary(current_y, current_x + direction)) return;
+  if (check_collisions(current_y, current_x + direction)) return;
 
   // remove the blocks from screen
   for (int i = 0; i < 8; i += 2)
     grid[current_y + current_block[i]][current_x + current_block[i + 1]] = false;
 
-  current_x++;
+  current_x += direction;
 
   // place the blocks on screen
-  for (int i = 0; i < 8; i += 2)
-    grid[current_y + current_block[i]][current_x + current_block[i + 1]] = true;
-}
-
-void Game::move_left() {
-  if (check_boundary(current_y, current_x - 1)) return;
-  if (check_collisions(current_y, current_x - 1)) return;
-
-  for (int i = 0; i < 8; i += 2)
-    grid[current_y + current_block[i]][current_x + current_block[i + 1]] = false;
-
-  current_x--;
-
   for (int i = 0; i < 8; i += 2)
     grid[current_y + current_block[i]][current_x + current_block[i + 1]] = true;
 }
@@ -361,7 +406,7 @@ bool Game::check_collisions(int new_y, int new_x) {
       if (cy < 0 || cy >= FIELD_HEIGHT) {
         return true;
       }
-      }
+    }
 
 
   for (int i = 0; i < 8; i += 2) {
@@ -385,35 +430,36 @@ void Game::reset() {
   current_game_state = NEW_BLOCK;
   current_x = 0;
   current_y = 0;
+
+  for (int i = 0; i < FIELD_HEIGHT; ++i) {
+    for (int j = 0; j < FIELD_WIDTH; ++j) {
+      grid[i][j] = false;
+    }
+  }
+
+  spawn_block();
 }
 
 void Game::run() {
+
   Uint32 frame_start = SDL_GetTicks();
+
   std::shuffle(std::begin(bag_sequence), std::end(bag_sequence),
-                  std::default_random_engine(2)); // NOLINT
+  std::default_random_engine(2)); // NOLINT
+
   spawn_block();
 
   while (is_running) {
-
     // input
     process_input();
 
-    if (current_game_state == NEW_BLOCK) {
-      spawn_block();
-    }
-
-    // handle gravity every second
-    if (SDL_GetTicks() - frame_start >= drop_rate) {
-      move_down();
-      frame_start = SDL_GetTicks();
-    }
-
     // update
-    update();
+    update(&frame_start);
 
     // render
     render();
   }
+
 }
 
 void Game::quit() {

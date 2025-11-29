@@ -7,6 +7,7 @@
     struct Tetrimino {
 
     };
+
     struct Cell {
       bool is_active = {false};
       Uint8 r = {0};
@@ -20,24 +21,23 @@
       SDL_Event event = {};
       bool is_running = {true};
       int grid[20][10] = {};
+      Cell new_grid[20][10] = {};
       int x_position = {0};
       int y_position = {0};
 
       bool check_boundary(int new_y, int new_x);
       void draw_field();
       void move_down();
-      void move_right();
-      void move_left();
-      void update();
+      void move(int direction);
+      void update(uint32_t *time);
       void render();
       void process_input();
       void spawn_block();
       void rotate_block();
       void clear_blocks();
-      void check_rotations();
+      bool check_rotations();
       void reset();
       void check_random_bag();
-      void check_bounds();
       bool check_collisions(int new_y, int new_x);
 
 
