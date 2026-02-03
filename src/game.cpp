@@ -224,7 +224,7 @@ bool Game::check_rotations() {
     temp_block[i] = tetriminoes[bag_sequence[current_bag_idx]].positions[rotation_idx][i];
   }
 
-  // check for border collision or object collision.
+  // Check for border collision or object collision.
   for (int i = 0; i < 8; i += 2) {
     int cy = current_y + temp_block[i];
     int cx = current_x + temp_block[i + 1];
@@ -300,7 +300,7 @@ void Game::clear_blocks() {
         grid[0][col] = false;
       }
 
-      // IMPORTANT: check the *same* row index again
+      // Check the *same* row index again
       i++;
     }
   }
